@@ -1,0 +1,102 @@
+image:
+  registry: docker.io
+  repository: postgres
+  tag: 9.6.6
+  pullPolicy: Always
+  debug: false
+
+replication:
+  enabled: false
+  user: repl_user
+  password: repl_password
+  slaveReplicas: 1
+
+postgresqlUsername: postgres
+
+service:
+  type: ClusterIP
+  port: 5432
+  annotations: {}
+persistence:
+  enabled: true
+  # storageClass: "-"
+  accessModes:
+    - ReadWriteOnce
+  size: 8Gi
+  annotations: {}
+
+nodeSelector: {}
+tolerations: []
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 250m
+
+networkPolicy:
+  enabled: false
+  allowExternal: true
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+metrics:
+  enabled: false
+  # resources: {}
+  # podAnnotations: {}
+  service:
+    type: ClusterIP
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9187"
+    loadBalancerIP:
+  image:
+    registry: docker.io
+    repository: wrouesnel/postgres_exporter
+    tag: v0.4.6
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ##
+    # pullSecrets:
+    #   - myRegistrKeySecretName
+
+  ## Metrics exporter labels and tolerations for pod assignment
+  # nodeSelector: {"beta.kubernetes.io/arch": "amd64"}
+  # tolerations: []
+
+  ## Metrics exporter pod Annotation and Labels
+  # podLabels: {}
+
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes)
+  ## Configure extra options for liveness and readiness probes
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+
+# Define custom environment variables to pass to the image here
+extraEnv: {}
