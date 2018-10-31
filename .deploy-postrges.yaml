@@ -44,6 +44,6 @@
   - cp $POSTGRES_INIT_SCRIPTS_PATH/*.sql postgres-data-preset/.kube/postgres-data-preset/sql
   - cd postgres-data-preset/.kube
   - helm install --debug --wait --timeout 60 --name pg-preset-${CI_COMMIT_SHA:0:7} -f postgres-data-preset/values.yaml
-    --set sql.scripts="$POSTGRES_SCRIPTS"
+    --set scripts.names="$POSTGRES_SCRIPTS"
     --set postgres.url="jdbc:postgresql://postgres:5432/$TEST_DATABASE_NAME"
     postgres-data-preset --namespace=$TEST_NAMESPACE
