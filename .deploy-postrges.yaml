@@ -1,0 +1,49 @@
+.install-kubectl: &install-kubectl |
+  apk add --quiet --no-progress --update jq curl bash
+  curl -sSL https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl \
+     && chmod +x /usr/local/bin/kubectl
+
+.kubectl: &kubectl |
+  echo $KUBE_URL
+  KUBECONFIG="$(pwd)/kubeconfig"
+  echo "$KUBE_CA_PEM" > "$(pwd)/kube.ca.pem"
+  KUBE_CLUSTER_OPTIONS=--certificate-authority="$(pwd)/kube.ca.pem"
+  kubectl config set-cluster gitlab-deploy --server="$KUBE_URL" $KUBE_CLUSTER_OPTIONS
+  kubectl config set-credentials gitlab-deploy --token="$KUBE_TOKEN" $KUBE_CLUSTER_OPTIONS
+  kubectl config set-context gitlab-deploy --cluster=gitlab-deploy --user=gitlab-deploy --namespace="$KUBE_NAMESPACE"
+  kubectl config use-context gitlab-deploy
+  kubectl version
+
+.install-helm: &install-helm |
+  curl -sSL https://storage.googleapis.com/kubernetes-helm/${HELM_FILENAME} | tar xz \
+     && mv linux-amd64/helm /usr/local/bin/helm \
+     && rm -rf linux-amd64
+  helm init --client-only
+
+.deploy-test-postgres:
+  script:
+  - *install-kubectl
+  - *kubectl
+  - *install-helm
+  - apk add --quiet --no-cache --virtual .deps git
+  - cd .kube
+  - git clone https://github.com/Zerotul/helm-charts.git charts
+  - until kubectl get ns $TEST_NAMESPACE -ojsonpath='{..status.phase}' | grep Active; do sleep 5; done
+  - helm install --wait --timeout 120 --set postgresqlUsername=postgres,postgresqlPassword=postgres
+    --set postgresqlDatabase=$TEST_DATABASE_NAME
+    --set persistence.size="500Mi"
+    --set fullnameOverride="postgres"
+    --name postgres-${CI_COMMIT_SHA:0:7} charts/postgres --namespace="$TEST_NAMESPACE"
+  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@git.fasten.com/ustaxi/QA/tools/postgres-data-preset.git postgres-data-preset
+  - cd postgres-data-preset
+  - git checkout data_preset
+  - cd ..
+  - mkdir postgres-data-preset/.kube/postgres-data-preset/sql
+  - pwd
+  - ls /
+  - cp $POSTGRES_INIT_SCRIPTS_PATH/*.sql postgres-data-preset/.kube/postgres-data-preset/sql
+  - cd postgres-data-preset/.kube
+  - helm install --debug --wait --timeout 60 --name pg-preset-${CI_COMMIT_SHA:0:7} -f postgres-data-preset/values.yaml
+    --set sql.scripts="$POSTGRES_SCRIPTS"
+    --set postgres.url="jdbc:postgresql://postgres:5432/$TEST_DATABASE_NAME"
+    postgres-data-preset --namespace=$TEST_NAMESPACE
